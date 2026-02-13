@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Two Years — Rosé</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0a0a0b;
+  --bg-mid: #111113;
+  --rose: #b76e79;
+  --rose-glow: #d4919b;
+  --rose-bright: #e8a5ae;
+  --mist: #e8e4e0;
+  --cream: #f5f0eb;
+  --rose-soft: rgba(183,110,121,0.12);
+  --rose-deep: #8b4a52;
+}
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  font-family: 'Playfair Display', serif;
+  color: var(--mist);
+}
+
+#bg-canvas {
+  position: fixed; inset: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+}
+
+/* ── Cinematic Overlays ── */
+#vignette {
+  position: fixed; inset: 0; z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(ellipse 80% 70% at 50% 50%, transparent 35%, rgba(0,0,0,0.55) 100%);
+}
+
+#film-grain {
+  position: fixed; inset: 0; z-index: 2;
+  pointer-events: none; opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  background-size: 128px 128px;
+  mix-blend-mode: overlay;
+}
+
+#ambient-glow {
+  position: fixed;
+  top: 50%; left: 50%;
+  width: 700px; height: 700px;
+  transform: translate(-50%, -50%);
+  z-index: 3; pointer-events: none;
+  background: radial-gradient(ellipse, rgba(183,110,121,0.05) 0%, transparent 65%);
+  filter: blur(80px);
+  opacity: 0; transition: opacity 2s ease;
+}
+#ambient-glow.active { opacity: 1; }
+
+/* ── Lyric Layer ── */
+#lyric-layer {
+  position: fixed; inset: 0; z-index: 10;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+}
+
+#lyric-container {
+  text-align: center;
+  max-width: 1060px;
+  padding: 0 44px;
+  perspective: 1000px;
+}
+
+.lyric-line {
+  display: flex; flex-wrap: wrap;
+  justify-content: center;
+  gap: 0 13px;
+  margin-bottom: 4px;
+  min-height: 62px;
+}
+
+.word-span {
+  display: inline-block;
+  font-size: clamp(26px, 4.4vw, 56px);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--mist);
+  opacity: 0;
+  transform: scale(1.45) translateY(18px);
+  filter: blur(15px);
+  will-change: transform, opacity, filter;
+  line-height: 1.4;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+.word-span.active {
+  color: var(--rose-bright);
+  text-shadow:
+    0 0 14px rgba(183,110,121,0.75),
+    0 0 45px rgba(183,110,121,0.35),
+    0 0 90px rgba(183,110,121,0.12),
+    0 2px 16px rgba(0,0,0,0.5);
+  transition: color 0.12s ease, text-shadow 0.12s ease;
+}
+
+.word-span.revealed {
+  color: rgba(232,228,224,0.48);
+  text-shadow:
+    0 0 5px rgba(183,110,121,0.08),
+    0 1px 6px rgba(0,0,0,0.25);
+  transition: color 0.55s ease, text-shadow 0.55s ease;
+}
+
+/* ── HUD ── */
+#hud {
+  position: fixed; bottom: 30px;
+  left: 50%; transform: translateX(-50%);
+  z-index: 100;
+  display: flex; flex-direction: column;
+  align-items: center; gap: 12px;
+  pointer-events: all;
+}
+
+#progress-bar-wrap {
+  width: 420px; max-width: 82vw;
+  height: 3px;
+  background: rgba(255,255,255,0.035);
+  border-radius: 3px; overflow: hidden;
+  cursor: pointer; position: relative;
+}
+
+#progress-bar-wrap::after {
+  content: '';
+  position: absolute; inset: 0;
+  border: 1px solid rgba(183,110,121,0.06);
+  border-radius: 3px; pointer-events: none;
+}
+
+#progress-bar {
+  width: 0%; height: 100%;
+  background: linear-gradient(90deg, var(--rose-deep), var(--rose), var(--rose-glow));
+  border-radius: 3px;
+  transition: width 0.1s linear;
+  box-shadow: 0 0 14px rgba(183,110,121,0.25);
+}
+
+#time-display {
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  color: rgba(232,228,224,0.2);
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+
+#start-btn {
+  padding: 14px 56px;
+  font-family: 'Playfair Display', serif;
+  font-size: 13.5px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--mist);
+  background: rgba(183,110,121,0.05);
+  border: 1px solid rgba(183,110,121,0.25);
+  border-radius: 0;
+  cursor: pointer;
+  transition: all 0.5s cubic-bezier(0.25,0.46,0.45,0.94);
+  backdrop-filter: blur(10px);
+  position: relative; overflow: hidden;
+}
+
+#start-btn::before {
+  content: '';
+  position: absolute; top: 0; left: -100%;
+  width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(183,110,121,0.1), transparent);
+  transition: left 0.65s ease;
+}
+
+#start-btn:hover {
+  background: rgba(183,110,121,0.1);
+  border-color: var(--rose);
+  color: #fff;
+  box-shadow: 0 0 35px rgba(183,110,121,0.12);
+}
+#start-btn:hover::before { left: 100%; }
+
+#start-btn.hidden {
+  opacity: 0; pointer-events: none;
+  transform: translateY(8px);
+  transition: all 0.5s ease;
+}
+
+/* ── Title Card ── */
+#title-card {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 16px; background: var(--bg);
+}
+
+#title-card h1 {
+  font-size: clamp(42px, 7.5vw, 88px);
+  font-weight: 700;
+  color: var(--rose);
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 70px rgba(183,110,121,0.18);
+  opacity: 0; transform: translateY(24px);
+}
+
+#title-card .divider {
+  width: 60px; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--rose), transparent);
+  opacity: 0;
+}
+
+#title-card p {
+  font-size: clamp(12px, 1.6vw, 18px);
+  font-style: italic; font-weight: 400;
+  color: rgba(232,228,224,0.25);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  opacity: 0; transform: translateY(12px);
+}
+
+/* ── Section Label ── */
+#section-label {
+  position: fixed; top: 38px;
+  left: 50%; transform: translateX(-50%);
+  z-index: 15;
+  font-size: 9.5px; letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: rgba(183,110,121,0.22);
+  font-weight: 500; pointer-events: none;
+  opacity: 0; transition: opacity 0.8s ease;
+}
+#section-label.visible { opacity: 1; }
+
+/* ── Horizontal breath line ── */
+#breath-line {
+  position: fixed;
+  top: 50%; left: 50%;
+  width: 0; height: 1px;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(90deg, transparent, rgba(183,110,121,0.08), transparent);
+  z-index: 5; pointer-events: none;
+  transition: width 2s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+#breath-line.active { width: 70vw; }
+
+/* ── Loading overlay ── */
+#loading {
+  position: fixed; inset: 0; z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg);
+  font-size: 14px;
+  letter-spacing: 0.2em;
+  color: rgba(232,228,224,0.25);
+}
+#loading.hidden { display: none; }
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+<div id="vignette"></div>
+<div id="film-grain"></div>
+<div id="ambient-glow"></div>
+<div id="breath-line"></div>
+<div id="section-label"></div>
+
+<div id="loading">Loading lyrics...</div>
+
+<div id="title-card" style="display:none">
+  <h1>Two Years</h1>
+  <div class="divider"></div>
+  <p>Rosé</p>
+</div>
+
+<div id="lyric-layer">
+  <div id="lyric-container"></div>
+</div>
+
+<div id="hud">
+  <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
+  <div id="time-display">0:00 / 0:00</div>
+  <button id="start-btn" style="display:none">Experience</button>
+</div>
+
+<audio id="audio-player" preload="auto" src="assets/songs/rose_twoyear.mp3"></audio>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   BOOT — Load lyrics.json then initialize everything
+   ═══════════════════════════════════════════════════════════════ */
+(async function boot() {
+
+  /* ─── 1. Fetch lyrics data from Python-generated JSON ─── */
+  let data;
+  try {
+    const resp = await fetch('assets/lyrics.json?v=' + Date.now());
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    data = await resp.json();
+  } catch (err) {
+    document.getElementById('loading').textContent =
+      'Error loading lyrics.json — run transcribe_v2.py first';
+    console.error('Failed to load lyrics.json:', err);
+    return;
+  }
+
+  const lyrics   = data.words;     // [{word, time, line}, ...]
+  const sections = data.sections;  // [{time, label}, ...]
+  const lineCount = data.totalLines;
+
+  console.log(`Loaded ${lyrics.length} words across ${lineCount} lines`);
+
+  /* ─── Hide loading, show title card ─── */
+  document.getElementById('loading').classList.add('hidden');
+  const titleCard = document.getElementById('title-card');
+  titleCard.style.display = '';
+
+  /* ─── Title card entrance ─── */
+  const h1  = titleCard.querySelector('h1');
+  const divEl = titleCard.querySelector('.divider');
+  const pEl   = titleCard.querySelector('p');
+  gsap.to(h1,   { opacity: 1, y: 0, duration: 1.3, delay: 0.3, ease: 'power3.out' });
+  gsap.to(divEl, { opacity: 1,       duration: 1.0, delay: 0.9, ease: 'power2.out' });
+  gsap.to(pEl,   { opacity: 1, y: 0, duration: 1.0, delay: 1.2, ease: 'power3.out' });
+
+  const startBtn = document.getElementById('start-btn');
+  startBtn.style.display = '';
+
+  /* ═══════════════════════════════════════════════════════════
+     2. THREE.JS — PARTICLE BACKGROUND
+     ═══════════════════════════════════════════════════════════ */
+  const canvas = document.getElementById('bg-canvas');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x0a0a0b, 1);
+
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x0a0a0b, 0.0009);
+
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 2200);
+  camera.position.set(0, 0, 420);
+
+  const PC = 5000;
+  const posArr = new Float32Array(PC * 3);
+  const velArr = new Float32Array(PC * 3);
+  const colArr = new Float32Array(PC * 3);
+
+  const cRose = new THREE.Color(0xb76e79);
+  const cMist = new THREE.Color(0xe8e4e0);
+  const cDeep = new THREE.Color(0x8b4a52);
+  const cDust = new THREE.Color(0x6e5560);
+
+  for (let i = 0; i < PC; i++) {
+    const i3 = i * 3;
+    posArr[i3]     = (Math.random() - 0.5) * 1600;
+    posArr[i3 + 1] = (Math.random() - 0.5) * 1100;
+    posArr[i3 + 2] = (Math.random() - 0.5) * 1400;
+    velArr[i3]     = (Math.random() - 0.5) * 0.09;
+    velArr[i3 + 1] = (Math.random() - 0.5) * 0.06 + 0.02;
+    velArr[i3 + 2] = (Math.random() - 0.5) * 0.09;
+    const t = Math.random();
+    let col;
+    if      (t < 0.35) col = cRose.clone().lerp(cDeep, Math.random());
+    else if (t < 0.6)  col = cMist.clone().lerp(cRose, Math.random() * 0.2);
+    else               col = cDust.clone().lerp(cRose, Math.random() * 0.5);
+    colArr[i3] = col.r; colArr[i3+1] = col.g; colArr[i3+2] = col.b;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(colArr, 3));
+
+  const tc = document.createElement('canvas'); tc.width = tc.height = 64;
+  const cx = tc.getContext('2d');
+  const gr = cx.createRadialGradient(32,32,0,32,32,32);
+  gr.addColorStop(0,'rgba(255,255,255,1)');
+  gr.addColorStop(0.18,'rgba(255,255,255,0.7)');
+  gr.addColorStop(0.5,'rgba(255,255,255,0.18)');
+  gr.addColorStop(1,'rgba(255,255,255,0)');
+  cx.fillStyle = gr; cx.fillRect(0,0,64,64);
+  const pTex = new THREE.CanvasTexture(tc);
+
+  const pMat = new THREE.PointsMaterial({
+    size: 3.2, map: pTex, vertexColors: true,
+    transparent: true, opacity: 0.6,
+    depthWrite: false, blending: THREE.AdditiveBlending,
+    sizeAttenuation: true,
+  });
+  scene.add(new THREE.Points(geo, pMat));
+
+  let turbStr = 0;
+  function triggerTurbulence(v) { turbStr = Math.max(turbStr, v); }
+
+  function updateParticles(dt) {
+    const p = geo.attributes.position.array;
+    for (let i = 0; i < PC; i++) {
+      const i3 = i * 3;
+      p[i3]   += velArr[i3]   * dt * 60;
+      p[i3+1] += velArr[i3+1] * dt * 60;
+      p[i3+2] += velArr[i3+2] * dt * 60;
+      if (turbStr > 0.01) {
+        p[i3]   += (Math.random()-0.5) * turbStr * 3;
+        p[i3+1] += (Math.random()-0.5) * turbStr * 3;
+        p[i3+2] += (Math.random()-0.5) * turbStr * 1.5;
+      }
+      if (p[i3]>800) p[i3]=-800; if (p[i3]<-800) p[i3]=800;
+      if (p[i3+1]>550) p[i3+1]=-550; if (p[i3+1]<-550) p[i3+1]=550;
+      if (p[i3+2]>700) p[i3+2]=-700; if (p[i3+2]<-700) p[i3+2]=700;
+    }
+    turbStr *= 0.93;
+    geo.attributes.position.needsUpdate = true;
+  }
+
+  let camA = 0;
+  function updateCamera(dt) {
+    camA += dt * 0.055;
+    camera.position.x = Math.sin(camA) * 32;
+    camera.position.y = Math.cos(camA * 0.6) * 20;
+    camera.position.z = 420 + Math.sin(camA * 0.3) * 12;
+    camera.lookAt(0, 0, 0);
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     3. BUILD LYRIC DOM (dynamic from JSON)
+     ═══════════════════════════════════════════════════════════ */
+  const container = document.getElementById('lyric-container');
+  const lineEls = [], wordEls = [];
+
+  for (let l = 0; l < lineCount; l++) {
+    const d = document.createElement('div');
+    d.className = 'lyric-line'; d.style.display = 'none';
+    container.appendChild(d); lineEls.push(d);
+  }
+  lyrics.forEach((e, i) => {
+    const s = document.createElement('span');
+    s.className = 'word-span'; s.textContent = e.word; s.dataset.idx = i;
+    lineEls[e.line].appendChild(s); wordEls.push(s);
+  });
+
+  /* ═══════════════════════════════════════════════════════════
+     4. GSAP ANIMATION ENGINE
+     ═══════════════════════════════════════════════════════════ */
+  let revealed = new Set(), activeLine = -1, activeWord = -1;
+
+  function lineRange(l) {
+    const w = lyrics.filter(x => x.line === l);
+    const s = w[0].time;
+    const nw = lyrics.filter(x => x.line === l + 1);
+    return { start: s, end: nw.length ? nw[0].time - 0.2 : w[w.length-1].time + 3.5 };
+  }
+
+  function showLine(l) {
+    if (activeLine === l) return;
+    if (activeLine >= 0 && activeLine !== l) evaporateLine(activeLine);
+    activeLine = l;
+    const el = lineEls[l]; el.style.display = 'flex';
+    gsap.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.3, ease: 'power2.out' });
+  }
+
+  function evaporateLine(l) {
+    const el = lineEls[l];
+    el.querySelectorAll('.word-span').forEach((sp, i) => {
+      gsap.to(sp, {
+        y: -50 - Math.random() * 30, opacity: 0, filter: 'blur(11px)', scale: 0.93,
+        duration: 0.9 + Math.random() * 0.3, delay: i * 0.03, ease: 'power2.in',
+        onComplete: () => {
+          sp.classList.remove('active','revealed');
+          gsap.set(sp, { clearProps:'all', opacity:0, transform:'scale(1.45) translateY(18px)', filter:'blur(15px)' });
+        }
+      });
+    });
+    gsap.to(el, { opacity: 0, duration: 1.2, delay: 0.2, onComplete: () => { el.style.display = 'none'; } });
+  }
+
+  function revealWord(i) {
+    if (revealed.has(i)) return;
+    revealed.add(i);
+    triggerTurbulence(0.45);
+    gsap.fromTo(wordEls[i],
+      { scale: 1.45, opacity: 0, filter: 'blur(15px)', y: 18 },
+      { scale: 1, opacity: 1, filter: 'blur(0px)', y: 0, duration: 0.4, ease: 'power3.out' }
+    );
+    wordEls[i].classList.add('active');
+  }
+
+  function deactivate(i) {
+    wordEls[i].classList.remove('active');
+    wordEls[i].classList.add('revealed');
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     5. AUDIO PLAYBACK ENGINE
+     ═══════════════════════════════════════════════════════════ */
+  const audio      = document.getElementById('audio-player');
+  const progBar    = document.getElementById('progress-bar');
+  const progWrap   = document.getElementById('progress-bar-wrap');
+  const timeDisp   = document.getElementById('time-display');
+  const secLabel   = document.getElementById('section-label');
+  const ambGlow    = document.getElementById('ambient-glow');
+  const breathLine = document.getElementById('breath-line');
+
+  let playing = false, lastRAF = 0;
+
+  function fmt(s) {
+    return `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+  }
+
+  progWrap.addEventListener('click', e => {
+    if (!audio.duration) return;
+    const r = progWrap.getBoundingClientRect();
+    audio.currentTime = ((e.clientX - r.left) / r.width) * audio.duration;
+    resetState();
+  });
+
+  function resetState() {
+    wordEls.forEach(sp => {
+      gsap.killTweensOf(sp); sp.classList.remove('active','revealed');
+      gsap.set(sp, { clearProps:'all', opacity:0, transform:'scale(1.45) translateY(18px)', filter:'blur(15px)' });
+    });
+    lineEls.forEach(el => { gsap.killTweensOf(el); el.style.display='none'; el.style.opacity='1'; });
+    revealed = new Set(); activeLine = -1; activeWord = -1;
+  }
+
+  let curSec = '';
+  function updSection(t) {
+    if (!sections || !sections.length) return;
+    let lbl = '';
+    for (let i = sections.length - 1; i >= 0; i--) {
+      if (t >= sections[i].time) { lbl = sections[i].label; break; }
+    }
+    if (lbl !== curSec) {
+      curSec = lbl; secLabel.textContent = lbl;
+      if (lbl) {
+        secLabel.classList.add('visible');
+        gsap.fromTo(secLabel,{opacity:0,y:-5},{opacity:1,y:0,duration:0.5});
+      } else {
+        secLabel.classList.remove('visible');
+      }
+    }
+  }
+
+  let glowOn = false;
+
+  function mainLoop(ts) {
+    if (!playing) return;
+    const dt = lastRAF === 0 ? 0.016 : (ts - lastRAF) / 1000;
+    lastRAF = ts;
+    const ct = audio.currentTime, dur = audio.duration || 1;
+
+    progBar.style.width = Math.min(ct / dur * 100, 100) + '%';
+    timeDisp.textContent = `${fmt(ct)} / ${fmt(dur)}`;
+    updSection(ct);
+
+    /* ambient glow on/off */
+    const hasL = ct >= lyrics[0].time - 0.4 && ct <= lyrics[lyrics.length-1].time + 3;
+    if (hasL && !glowOn) { ambGlow.classList.add('active'); breathLine.classList.add('active'); glowOn = true; }
+    if (!hasL && glowOn) { ambGlow.classList.remove('active'); breathLine.classList.remove('active'); glowOn = false; }
+
+    /* find current line */
+    let curLine = -1;
+    for (let l = 0; l < lineCount; l++) {
+      const r = lineRange(l);
+      if (ct >= r.start - 0.3 && ct < r.end) { curLine = l; break; }
+    }
+    if (curLine >= 0) showLine(curLine);
+
+    /* reveal words */
+    for (let i = 0; i < lyrics.length; i++) {
+      if (ct >= lyrics[i].time && !revealed.has(i)) revealWord(i);
+    }
+
+    /* highlight active word */
+    let nw = -1;
+    for (let i = lyrics.length - 1; i >= 0; i--) {
+      if (ct >= lyrics[i].time) { nw = i; break; }
+    }
+    if (nw !== activeWord) {
+      if (activeWord >= 0) deactivate(activeWord);
+      activeWord = nw;
+      if (activeWord >= 0) {
+        wordEls[activeWord].classList.add('active');
+        wordEls[activeWord].classList.remove('revealed');
+      }
+    }
+
+    updateParticles(dt); updateCamera(dt);
+    renderer.render(scene, camera);
+
+    if (audio.ended) {
+      if (activeLine >= 0) evaporateLine(activeLine);
+      ambGlow.classList.remove('active'); breathLine.classList.remove('active');
+      secLabel.classList.remove('visible'); playing = false; return;
+    }
+    requestAnimationFrame(mainLoop);
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     6. IDLE LOOP
+     ═══════════════════════════════════════════════════════════ */
+  let idleOn = true, pIdle = 0;
+  function idleLoop(t) {
+    if (!idleOn) return;
+    if (!pIdle) pIdle = t;
+    const dt = (t - pIdle) / 1000; pIdle = t;
+    updateParticles(dt); updateCamera(dt);
+    renderer.render(scene, camera);
+    requestAnimationFrame(idleLoop);
+  }
+  requestAnimationFrame(idleLoop);
+
+  /* ═══════════════════════════════════════════════════════════
+     7. START BUTTON
+     ═══════════════════════════════════════════════════════════ */
+  startBtn.addEventListener('click', () => {
+    startBtn.classList.add('hidden');
+    gsap.to(h1,   { opacity: 0, y: -30, duration: 0.8, ease: 'power2.in' });
+    gsap.to(divEl, { opacity: 0, scaleX: 0, duration: 0.6, delay: 0.1 });
+    gsap.to(pEl,   { opacity: 0, y: 20, duration: 0.7, delay: 0.05 });
+    gsap.to(titleCard, { opacity: 0, duration: 1.0, delay: 0.3,
+      onComplete: () => {
+        titleCard.style.display = 'none';
+        idleOn = false; playing = true; lastRAF = 0;
+        audio.play(); requestAnimationFrame(mainLoop);
+      }
+    });
+  });
+
+  audio.addEventListener('play',  () => { if (!playing) { playing = true; lastRAF = 0; requestAnimationFrame(mainLoop); } });
+  audio.addEventListener('pause', () => { playing = false; });
+
+  /* ═══════════════════════════════════════════════════════════
+     8. RESIZE
+     ═══════════════════════════════════════════════════════════ */
+  window.addEventListener('resize', () => {
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+  });
+
+})();
+</script>
+</body>
+</html>

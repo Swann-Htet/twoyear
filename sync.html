@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lyric Sync Tool — Two Years</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+:root {
+  --bg: #0e0e10;
+  --surface: #16161a;
+  --surface2: #1e1e24;
+  --rose: #b76e79;
+  --rose-glow: #d4919b;
+  --green: #4ade80;
+  --mist: #e0ddd8;
+  --dim: #72717a;
+  --border: rgba(255,255,255,0.06);
+}
+
+html, body {
+  width:100%; height:100%;
+  background: var(--bg);
+  font-family: 'Inter', sans-serif;
+  color: var(--mist);
+  overflow: hidden;
+}
+
+/* ── Layout ── */
+#app {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100vh;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* ── Header ── */
+header {
+  padding: 28px 0 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+header h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--rose);
+  letter-spacing: 0.03em;
+}
+
+header .status {
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+header .status .dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--dim);
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+header .status.recording .dot { background: #ef4444; animation: pulse 1s infinite; }
+header .status.done .dot { background: var(--green); }
+
+@keyframes pulse { 0%,100%{ opacity:1; } 50%{ opacity:0.3; } }
+
+/* ── Main Area ── */
+main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  padding: 24px 0;
+  overflow: hidden;
+}
+
+/* ── Word Display ── */
+#word-area {
+  text-align: center;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+#current-word {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(42px, 8vw, 80px);
+  font-weight: 700;
+  color: var(--mist);
+  transition: color 0.15s;
+  min-height: 1.2em;
+}
+
+#current-word.active { color: var(--rose-glow); }
+
+#word-context {
+  font-size: 14px;
+  color: var(--dim);
+  max-width: 600px;
+  line-height: 1.6;
+}
+
+#word-context .past { color: rgba(183,110,121,0.5); }
+#word-context .future { color: var(--dim); }
+#word-context .current { color: var(--rose-glow); font-weight: 600; }
+
+#word-counter {
+  font-size: 12px;
+  color: var(--dim);
+  letter-spacing: 0.1em;
+}
+
+/* ── Instructions ── */
+#instructions {
+  text-align: center;
+  padding: 24px 32px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  max-width: 500px;
+}
+
+#instructions h2 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--mist);
+}
+
+#instructions p {
+  font-size: 13px;
+  color: var(--dim);
+  line-height: 1.7;
+}
+
+#instructions kbd {
+  display: inline-block;
+  padding: 2px 8px;
+  background: var(--surface2);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 4px;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: var(--mist);
+  margin: 0 2px;
+}
+
+/* ── Buttons ── */
+.btn {
+  padding: 12px 36px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-primary {
+  background: var(--rose);
+  color: #fff;
+}
+.btn-primary:hover { background: var(--rose-glow); }
+
+.btn-secondary {
+  background: var(--surface2);
+  color: var(--mist);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover { border-color: var(--rose); }
+
+.btn-group {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* ── Footer / Player ── */
+footer {
+  padding: 16px 0 24px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+#audio-time {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dim);
+  min-width: 100px;
+}
+
+#audio-bar-wrap {
+  flex: 1;
+  height: 4px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+#audio-bar {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--rose), var(--rose-glow));
+  border-radius: 4px;
+  transition: width 0.1s linear;
+}
+
+/* ── Output Panel ── */
+#output-panel {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0,0,0,0.85);
+  backdrop-filter: blur(12px);
+}
+
+#output-panel.visible { display: flex; align-items: center; justify-content: center; }
+
+#output-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 32px;
+  width: 90%;
+  max-width: 700px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+#output-box h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 22px;
+  color: var(--rose);
+}
+
+#output-box p {
+  font-size: 13px;
+  color: var(--dim);
+  line-height: 1.6;
+}
+
+#output-textarea {
+  flex: 1;
+  min-height: 200px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 11.5px;
+  color: var(--mist);
+  resize: none;
+  line-height: 1.5;
+}
+
+#copy-status {
+  font-size: 12px;
+  color: var(--green);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <header>
+    <h1>Lyric Sync Tool</h1>
+    <div class="status" id="status-badge">
+      <span class="dot"></span>
+      <span id="status-text">Ready</span>
+    </div>
+  </header>
+
+  <main>
+    <div id="word-area">
+      <div id="current-word">—</div>
+      <div id="word-context"></div>
+      <div id="word-counter"></div>
+    </div>
+
+    <div id="instructions">
+      <h2>How to Sync</h2>
+      <p>
+        1. Click <strong>Start Sync</strong> — the song plays.<br>
+        2. Press <kbd>Space</kbd> or <kbd>Enter</kbd> exactly when each word is <em>sung</em>.<br>
+        3. Each tap records the timestamp and advances to the next word.<br>
+        4. When all words are done, the synced data is generated automatically.<br>
+        5. Click <strong>Apply to Visualizer</strong> to save — done.
+      </p>
+    </div>
+
+    <div class="btn-group">
+      <button class="btn btn-primary" id="btn-start">Start Sync</button>
+      <button class="btn btn-secondary" id="btn-redo" style="display:none">Redo from Start</button>
+      <button class="btn btn-secondary" id="btn-undo" style="display:none">Undo Last ←</button>
+    </div>
+  </main>
+
+  <footer>
+    <div id="audio-time">0:00 / 0:00</div>
+    <div id="audio-bar-wrap"><div id="audio-bar"></div></div>
+  </footer>
+</div>
+
+<!-- Output Panel -->
+<div id="output-panel">
+  <div id="output-box">
+    <h2>Sync Complete</h2>
+    <p>Your perfectly synced lyric data is ready. Click "Apply" to auto-save it to the visualizer, or copy the JSON manually.</p>
+    <textarea id="output-textarea" readonly></textarea>
+    <div class="btn-group">
+      <button class="btn btn-primary" id="btn-apply">Apply to Visualizer</button>
+      <button class="btn btn-secondary" id="btn-copy">Copy JSON</button>
+      <button class="btn btn-secondary" id="btn-close-output">Close</button>
+    </div>
+    <span id="copy-status">Copied!</span>
+  </div>
+</div>
+
+<audio id="audio" preload="auto" src="assets/songs/rose_twoyear.mp3"></audio>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   RAW LYRICS — words in order, grouped by line
+   ═══════════════════════════════════════════════════════════════ */
+const rawLines = [
+  /* Verse 1 */
+  "How did it all fall apart?",
+  "You were right here before, in my arms",
+  "Now you're invisible",
+  "But the heartbreak's physical",
+  /* Verse 2 */
+  "Got a place, moved away",
+  "Somewhere with a different code, different state",
+  "Still feels miserable",
+  "God, it's so chemical",
+  /* Pre-Chorus 1 */
+  "All that I know",
+  "Is I can't let you go",
+  /* Chorus 1 */
+  "It's been two years and you're still not gone",
+  "I've been living with a love I can't move on from",
+  "It's been two years, now I'm pouring one more",
+  "I've been drinking 'cause I just can't feel it enough",
+  /* Verse 3 */
+  "Got a man, got a life",
+  "Still got nothing 'cause it's you on my mind",
+  "And an old broken voice",
+  "Still the thing I want to hear the most",
+  /* Pre-Chorus 2 */
+  "All that I know",
+  "Is I can't let you go",
+  /* Chorus 2 */
+  "It's been two years and you're still not gone",
+  "I've been living with a love I can't move on from",
+  "It's been two years, now I'm pouring one more",
+  "I've been drinking 'cause I just can't feel it enough",
+  /* Bridge */
+  "Oh, 'cause I just can't feel it enough",
+  "Yeah, I just can't feel it enough",
+  /* Final Chorus */
+  "It's been two years and you're still not gone",
+  "I've been living with a love I can't move on from",
+  "It's been two years, now I'm pouring one more",
+  "I've been drinking 'cause I just can't feel it enough",
+];
+
+// Flatten into word objects
+const allWords = [];
+rawLines.forEach((line, lineIdx) => {
+  line.split(/\s+/).forEach(word => {
+    allWords.push({ word, line: lineIdx, time: null });
+  });
+});
+
+const totalWords = allWords.length;
+
+/* ═══════════════════════════════════════════════════════════════
+   DOM
+   ═══════════════════════════════════════════════════════════════ */
+const audio       = document.getElementById('audio');
+const wordDisplay = document.getElementById('current-word');
+const wordContext = document.getElementById('word-context');
+const wordCounter = document.getElementById('word-counter');
+const statusBadge = document.getElementById('status-badge');
+const statusText  = document.getElementById('status-text');
+const audioTime   = document.getElementById('audio-time');
+const audioBar    = document.getElementById('audio-bar');
+const btnStart    = document.getElementById('btn-start');
+const btnRedo     = document.getElementById('btn-redo');
+const btnUndo     = document.getElementById('btn-undo');
+const outputPanel = document.getElementById('output-panel');
+const outputTA    = document.getElementById('output-textarea');
+const btnApply    = document.getElementById('btn-apply');
+const btnCopy     = document.getElementById('btn-copy');
+const btnCloseOut = document.getElementById('btn-close-output');
+const copyStatus  = document.getElementById('copy-status');
+
+let currentIdx  = 0;
+let syncing     = false;
+let finished    = false;
+
+function fmt(s) {
+  return `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+}
+
+/* ── Build context string (shows surrounding words) ── */
+function buildContext() {
+  const RADIUS = 8;
+  let html = '';
+  const start = Math.max(0, currentIdx - RADIUS);
+  const end   = Math.min(totalWords, currentIdx + RADIUS + 1);
+  for (let i = start; i < end; i++) {
+    const cls = i < currentIdx ? 'past' : i === currentIdx ? 'current' : 'future';
+    html += `<span class="${cls}">${allWords[i].word}</span> `;
+    // add line break between lines
+    if (i < end - 1 && allWords[i].line !== allWords[i+1].line) {
+      html += '<br>';
+    }
+  }
+  wordContext.innerHTML = html;
+}
+
+function updateDisplay() {
+  if (currentIdx >= totalWords) {
+    wordDisplay.textContent = '✓';
+    wordDisplay.classList.remove('active');
+    wordCounter.textContent = `${totalWords} / ${totalWords} — done!`;
+    return;
+  }
+  wordDisplay.textContent = allWords[currentIdx].word;
+  wordDisplay.classList.add('active');
+  wordCounter.textContent = `Word ${currentIdx + 1} of ${totalWords}`;
+  buildContext();
+}
+
+/* ── Audio progress ── */
+function tickAudio() {
+  if (!audio.duration) return;
+  audioTime.textContent = `${fmt(audio.currentTime)} / ${fmt(audio.duration)}`;
+  audioBar.style.width = (audio.currentTime / audio.duration * 100) + '%';
+}
+
+setInterval(tickAudio, 100);
+
+/* ── TAP handler ── */
+function handleTap() {
+  if (!syncing || finished) return;
+  if (currentIdx >= totalWords) return;
+
+  allWords[currentIdx].time = parseFloat(audio.currentTime.toFixed(2));
+  currentIdx++;
+
+  if (currentIdx >= totalWords) {
+    finishSync();
+  } else {
+    updateDisplay();
+  }
+}
+
+function finishSync() {
+  syncing = false;
+  finished = true;
+  audio.pause();
+  statusBadge.className = 'status done';
+  statusText.textContent = 'Complete';
+  updateDisplay();
+  btnUndo.style.display = 'none';
+
+  // Generate output
+  generateOutput();
+  outputPanel.classList.add('visible');
+}
+
+/* ── Generate JSON output ── */
+function generateOutput() {
+  let js = 'const lyrics = [\n';
+  let prevLine = -1;
+
+  allWords.forEach((w, i) => {
+    if (w.line !== prevLine) {
+      if (prevLine >= 0) js += '\n';
+      js += `  // Line ${w.line} — "${rawLines[w.line]}"\n`;
+      prevLine = w.line;
+    }
+    const pad = w.word.length < 10 ? ' '.repeat(10 - w.word.length) : ' ';
+    const tStr = w.time.toFixed(1);
+    const tPad = tStr.length < 5 ? ' '.repeat(5 - tStr.length) : '';
+    js += `  { word: "${w.word}",${pad}time: ${tStr},${tPad} line: ${w.line} },\n`;
+  });
+
+  js += '];\n';
+  outputTA.value = js;
+}
+
+/* ── Save synced data to localStorage so visualizer can read it ── */
+function applySyncData() {
+  const data = allWords.map(w => ({ word: w.word, time: w.time, line: w.line }));
+  localStorage.setItem('roseSyncedLyrics', JSON.stringify(data));
+  alert('Synced data saved! Open index.html — it will auto-load your timings.');
+  outputPanel.classList.remove('visible');
+}
+
+/* ── Events ── */
+btnStart.addEventListener('click', () => {
+  currentIdx = 0;
+  allWords.forEach(w => w.time = null);
+  syncing = true;
+  finished = false;
+
+  statusBadge.className = 'status recording';
+  statusText.textContent = 'Recording';
+  btnStart.textContent = 'Syncing…';
+  btnStart.disabled = true;
+  btnRedo.style.display = 'inline-block';
+  btnUndo.style.display = 'inline-block';
+  document.getElementById('instructions').style.display = 'none';
+
+  updateDisplay();
+  audio.currentTime = 0;
+  audio.play();
+});
+
+btnRedo.addEventListener('click', () => {
+  audio.pause();
+  audio.currentTime = 0;
+  currentIdx = 0;
+  allWords.forEach(w => w.time = null);
+  syncing = false;
+  finished = false;
+
+  statusBadge.className = 'status';
+  statusText.textContent = 'Ready';
+  btnStart.textContent = 'Start Sync';
+  btnStart.disabled = false;
+  btnUndo.style.display = 'none';
+
+  wordDisplay.textContent = '—';
+  wordDisplay.classList.remove('active');
+  wordContext.innerHTML = '';
+  wordCounter.textContent = '';
+  document.getElementById('instructions').style.display = '';
+});
+
+btnUndo.addEventListener('click', () => {
+  if (currentIdx <= 0 || !syncing) return;
+  currentIdx--;
+  allWords[currentIdx].time = null;
+  updateDisplay();
+});
+
+btnCopy.addEventListener('click', () => {
+  outputTA.select();
+  navigator.clipboard.writeText(outputTA.value).then(() => {
+    copyStatus.style.opacity = '1';
+    setTimeout(() => { copyStatus.style.opacity = '0'; }, 2000);
+  });
+});
+
+btnApply.addEventListener('click', applySyncData);
+btnCloseOut.addEventListener('click', () => { outputPanel.classList.remove('visible'); });
+
+// Keyboard: Space or Enter to tap
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' || e.code === 'Enter') {
+    e.preventDefault();
+    handleTap();
+  }
+  // Ctrl+Z to undo
+  if (e.ctrlKey && e.code === 'KeyZ') {
+    e.preventDefault();
+    if (currentIdx > 0 && syncing) {
+      currentIdx--;
+      allWords[currentIdx].time = null;
+      updateDisplay();
+    }
+  }
+});
+</script>
+</body>
+</html>
